@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: atlas-enem-ufg
+    env: node
+    region: oregon          # opções free: oregon | frankfurt | singapore | ohio
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /
+
+    envVars:
+      # ── Node ──────────────────────────────────────────────────────────────
+      - key: NODE_VERSION
+        value: 20.19.2
+      - key: NODE_ENV
+        value: production
+
+      # ── Supabase (preencher no dashboard do Render) ────────────────────
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false          # Render vai pedir o valor manualmente — NÃO commitar
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+
+      # ── Anthropic (preencher no dashboard do Render) ───────────────────
+      - key: ANTHROPIC_API_KEY
+        sync: false          # chave secreta — NUNCA commitar
+
+      # ── Next.js ───────────────────────────────────────────────────────────
+      - key: NEXTAUTH_URL
+        value: https://atlas-enem-ufg.onrender.com   # ajuste ao URL final
