@@ -164,4 +164,3 @@ Essas 3 chaves são **tudo** que o Render precisa além do código.
 
 *Atlas ENEM · UFG 2026 · Deploy via Render.com*
 # test
-# test2
