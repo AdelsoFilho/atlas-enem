@@ -134,8 +134,6 @@ export default function LearnSubjectPage() {
   // Busca progresso do usuário para esta matéria
   useEffect(() => {
     if (!user) return
-    const supabase = createClient()
-
     supabase
       .from("user_topic_progress")
       .select("topic_slug, step_completed")
