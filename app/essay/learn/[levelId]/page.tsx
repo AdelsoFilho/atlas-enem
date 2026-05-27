@@ -351,15 +351,17 @@ export default function LevelPage() {
   const { user } = useAuth()
 
   const {
-    loadTree, loadProgress, getLevels,
+    loadTree, loadProgress, loadLevelState, getLevels,
     isLevelUnlocked, progressMap, saveProgress,
-    isTreeLoaded, isProgressLoaded,
+    isTreeLoaded, isProgressLoaded, isLevelStateLoaded,
   } = useWritingProgressStore()
 
   useEffect(() => { loadTree() }, [loadTree])
   useEffect(() => {
-    if (user) loadProgress(user.id)
-  }, [user, loadProgress])
+    if (!user) return
+    loadProgress(user.id)
+    loadLevelState(user.id)
+  }, [user, loadProgress, loadLevelState])
 
   const levels    = getLevels()
   const level     = levels.find(l => l.levelNumber === levelId)
