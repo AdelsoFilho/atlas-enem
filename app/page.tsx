@@ -53,6 +53,22 @@ export default function HomePage() {
   const mounted                 = useHasMounted()
   const { subjectPerformance }  = useGamificationStore()
   const { user, signOut, loading: authLoading } = useAuth()
+
+  // Writing level state
+  const {
+    loadTree, loadProgress, loadLevelState, getLevels,
+    isTreeLoaded, isProgressLoaded, isLevelStateLoaded,
+  } = useWritingProgressStore()
+
+  useEffect(() => { loadTree() }, [loadTree])
+  useEffect(() => {
+    if (!user) return
+    loadProgress(user.id)
+    loadLevelState(user.id)
+  }, [user, loadProgress, loadLevelState])
+
+  const writingLevels = mounted && isTreeLoaded ? getLevels() : []
+  const writingReady  = mounted && isTreeLoaded && (!user || (isProgressLoaded && isLevelStateLoaded))
   const [showLogin, setShowLogin] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 
