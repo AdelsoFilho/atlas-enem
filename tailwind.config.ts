@@ -11,6 +11,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      screens: {
+        // Breakpoint para telefones muito pequenos (< 480px)
+        xs: "480px",
+      },
       colors: {
         // Paleta "Painel de Missão" - dark, focada, RPG
         background: "#0a0c10",
