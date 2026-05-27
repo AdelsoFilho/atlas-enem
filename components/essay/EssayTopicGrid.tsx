@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Zap, Loader2, WifiOff } from "lucide-react"
+import Link from "next/link"
+import { Zap, Loader2, WifiOff, Briefcase } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { useEssayStore } from "@/modules/essay/essay-store"
 import {
