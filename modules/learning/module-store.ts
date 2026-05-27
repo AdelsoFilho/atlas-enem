@@ -133,6 +133,16 @@ export const useModuleStore = create<ModuleStore>()((set, get) => ({
     }))
   },
 
+  activateReinforcement: (data) => set({
+    isReinforcementActive: true,
+    reinforcementData: data,
+  }),
+
+  confirmReinforcement: () => set({
+    isReinforcementActive: false,
+    // Mantém reinforcementData para histórico; pode ser resetado via reset()
+  }),
+
   reset: () => set(initialState),
 }))
 
