@@ -127,6 +127,28 @@ export default function EssayPage() {
               <ChevronRight className="h-4 w-4 text-[#ffd54f]/40 group-hover:text-[#ffd54f]/70 transition-colors shrink-0" />
             </Link>
 
+            {/* ── Do Zero ao 1000 CTA ────────────────────────────────────── */}
+            <Link
+              href="/essay/learn"
+              className="group mb-6 flex items-center gap-3 rounded-2xl border border-[#f78166]/25 bg-[#f78166]/5 p-4 transition-all hover:border-[#f78166]/50 hover:bg-[#f78166]/10 block"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f78166]/15">
+                <Crosshair className="h-5 w-5 text-[#f78166]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold text-[#f78166]">Do Zero ao 1000 — Módulo Progressivo</p>
+                  <span className="rounded-full border border-[#f78166]/30 bg-[#f78166]/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-[#f78166]/70 uppercase">
+                    Iniciantes
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-500 mt-0.5 leading-snug">
+                  6 níveis de aprendizado guiado. Comece pelo básico e evolua até o simulado completo.
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-[#f78166]/40 group-hover:text-[#f78166]/70 transition-colors shrink-0" />
+            </Link>
+
             <EssayEditor />
           </div>
 
