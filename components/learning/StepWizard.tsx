@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronRight, CheckCircle2, XCircle, Zap, AlertTriangle, RefreshCw } from "lucide-react"
+import { ChevronRight, CheckCircle2, XCircle, Zap, AlertTriangle, RefreshCw, Brain } from "lucide-react"
 import { useModuleStore, getTempoGasto } from "@/modules/learning/module-store"
 import type {
   TeoriaConteudo, ExemploConteudo, TreinoConteudo, SimuladoConteudo, Questao,
+  ReinforcementData,
 } from "@/modules/learning/module-types"
+import type { ValidateAnswerResponse } from "@/app/api/validate-answer/route"
 
 // ── Slide wrapper ─────────────────────────────────────────────────────────────
 
