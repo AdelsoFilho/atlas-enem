@@ -106,7 +106,41 @@ export const useModuleStore = create<ModuleStore>()((set, get) => ({
     respostaSimulado: null,
     simuladoCorreto: null,
     xpTotal: 0,
+    isRecovery: false,
+    // Mantém activeSessionId se já estiver definido pelo caller
   }),
+
+  loadFromSession: (module, sessionId, resumeStep) => {
+    // Mapeia o step salvo no DB para a tela correspondente do wizard.
+    // resumeStep 0-1 → teoria; 2 → exemplo; 3 → simulado; 4 → concluido
+    const screenMap: Record<number, ModuleScreen> = {
+      0: "teoria",
+      1: "teoria",
+      2: "exemplo",
+      3: "simulado",
+      4: "concluido",
+    }
+    const screen = screenMap[Math.min(resumeStep, 4)] ?? "teoria"
+
+    set({
+      module,
+      screen,
+      isLoading:             false,
+      loadError:             null,
+      respostas:             [],
+      tempoInicio:           screen === "treino" ? Date.now() : null,
+      validationResult:      null,
+      respostaSimulado:      null,
+      simuladoCorreto:       null,
+      xpTotal:               0,
+      isReinforcementActive: false,
+      reinforcementData:     null,
+      activeSessionId:       sessionId,
+      isRecovery:            resumeStep > 0,
+    })
+  },
+
+  setActiveSessionId: (id) => set({ activeSessionId: id }),
 
   setLoadError: (msg) => set({ isLoading: false, loadError: msg }),
 
