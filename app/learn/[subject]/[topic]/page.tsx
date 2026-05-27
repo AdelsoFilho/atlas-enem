@@ -151,7 +151,6 @@ export default function TopicModulePage() {
   useEffect(() => {
     if (screen !== "concluido" || !user || !topic) return
 
-    const supabase = createClient()
     const aprovado = validationResult?.aprovado ?? false
     const lacunas  = validationResult?.lacunas_identificadas ?? []
 
@@ -164,7 +163,7 @@ export default function TopicModulePage() {
       p_xp:         xpTotal,
       p_aprovado:   aprovado,
       p_lacunas:    lacunas,
-    }).then(({ error }) => {
+    }).then(({ error }: { error: unknown }) => {
       if (error) console.warn("[upsert_topic_progress concluido]", error)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
