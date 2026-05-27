@@ -97,3 +97,17 @@ export interface ValidationResult {
   feedback_curto: string
   analise_tempo: "rapido" | "normal" | "lento"
 }
+
+// ── Tutor Adaptativo ──────────────────────────────────────────────────────────
+
+/** Conteúdo do micro-reforço gerado pela IA quando o aluno erra questão crítica */
+export interface ReinforcementData {
+  lacuna:   string   // conceito que faltou (máx 8 palavras)
+  analogia: string   // texto ~150 palavras com analogia do mundo real
+}
+
+/** Resposta da rota /api/validate-answer */
+export interface ValidateAnswerResult {
+  requiresMicroReinforcement: boolean
+  reinforcementData?:         ReinforcementData
+}
