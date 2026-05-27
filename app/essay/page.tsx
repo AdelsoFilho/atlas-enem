@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, PenLine } from "lucide-react"
+import { ArrowLeft, PenLine, Briefcase, ChevronRight } from "lucide-react"
 import { EssayEditor } from "@/modules/essay/EssayEditor"
 import { useEssayStore } from "@/modules/essay/essay-store"
 
