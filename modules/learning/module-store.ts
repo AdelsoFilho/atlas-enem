@@ -86,6 +86,8 @@ const initialState: ModuleStoreState = {
   xpTotal: 0,
   isReinforcementActive: false,
   reinforcementData: null,
+  activeSessionId: null,
+  isRecovery: false,
 }
 
 export const useModuleStore = create<ModuleStore>()((set, get) => ({
