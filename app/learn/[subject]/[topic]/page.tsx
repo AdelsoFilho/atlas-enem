@@ -131,7 +131,6 @@ export default function TopicModulePage() {
     const step = SCREEN_STEP[screen]
     if (!step) return
 
-    const supabase = createClient()
     supabase.rpc("upsert_topic_progress", {
       p_user_id:    user.id,
       p_subject:    subject,
@@ -139,7 +138,7 @@ export default function TopicModulePage() {
       p_topic_title: topic.titulo,
       p_step:       step,
       p_xp:         0,  // XP real é salvo no concluido pelo StepWizard
-    }).then(({ error }) => {
+    }).then(({ error }: { error: unknown }) => {
       if (error) console.warn("[upsert_topic_progress]", error)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
