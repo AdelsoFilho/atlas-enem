@@ -653,20 +653,21 @@ interface StepWizardProps {
 const STEP_LABELS = ["Teoria", "Exemplo", "Treino", "Simulado"]
 
 export function StepWizard({ pesoUfg, onBack }: StepWizardProps) {
-  const { module, screen, advanceTo, reset } = useModuleStore()
+  const { module, screen, advanceTo, reset, isReinforcementActive, reinforcementData } = useModuleStore()
 
   if (!module) return null
 
-  const teoria  = module.modulos[0].conteudo as TeoriaConteudo
-  const exemplo = module.modulos[1].conteudo as ExemploConteudo
-  const treino  = module.modulos[2].conteudo as TreinoConteudo
-  const simulado= module.modulos[3].conteudo as SimuladoConteudo
+  const teoria   = module.modulos[0].conteudo as TeoriaConteudo
+  const exemplo  = module.modulos[1].conteudo as ExemploConteudo
+  const treino   = module.modulos[2].conteudo as TreinoConteudo
+  const simulado = module.modulos[3].conteudo as SimuladoConteudo
 
-  const stepIndex = ["teoria","exemplo","treino","validacao","simulado","concluido"].indexOf(screen)
+  const stepIndex    = ["teoria","exemplo","treino","validacao","simulado","concluido"].indexOf(screen)
   const progressStep = Math.min(stepIndex, 3)
 
   return (
-    <div className="flex flex-col gap-6">
+    // position: relative para o modal de reforço se posicionar dentro do wizard
+    <div className="relative flex flex-col gap-6">
       {/* Progress bar das etapas */}
       {screen !== "concluido" && (
         <div className="flex items-center gap-1">
@@ -698,7 +699,12 @@ export function StepWizard({ pesoUfg, onBack }: StepWizardProps) {
           <ExemploStep key="exemplo" conteudo={exemplo} onNext={() => advanceTo("treino")} />
         )}
         {screen === "treino" && (
-          <TreinoStep key="treino" conteudo={treino} onValidated={() => {}} />
+          <TreinoStep
+            key="treino"
+            conteudo={treino}
+            pesoUfg={pesoUfg}
+            onValidated={() => {}}
+          />
         )}
         {screen === "validacao" && (
           <ValidacaoStep
@@ -712,6 +718,13 @@ export function StepWizard({ pesoUfg, onBack }: StepWizardProps) {
         )}
         {screen === "concluido" && (
           <ConcluídoScreen key="concluido" onBack={onBack} onRepeat={reset} />
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Correção de Rota — sobrepõe o wizard inteiro quando ativo */}
+      <AnimatePresence>
+        {isReinforcementActive && reinforcementData && (
+          <ReinforcementModal key="reinforcement" data={reinforcementData} />
         )}
       </AnimatePresence>
     </div>
