@@ -125,6 +125,11 @@ export default function HomePage() {
         </div>
       </nav>
 
+      {/* ── ENEM Countdown ───────────────────────────────────────────────── */}
+      <section className="mb-4">
+        <CountdownTimer />
+      </section>
+
       {/* ── Player ───────────────────────────────────────────────────────── */}
       <section className="mb-6">
         <PlayerHeader />
