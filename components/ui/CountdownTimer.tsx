@@ -2,22 +2,22 @@
 
 import { useCountdown, ENEM_2026_DATE } from "@/hooks/useCountdown"
 
-// ── Utils ─────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function pad(n: number): string {
   return String(n).padStart(2, "0")
 }
 
 // ── Unit block ────────────────────────────────────────────────────────────────
+// Fonte mono + tabular-nums elimina o "pulo de layout" a cada tick.
 
 function Unit({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex flex-col items-center">
-      {/* Fonte mono para evitar pulo de layout quando o dígito muda */}
-      <span className="font-mono text-[15px] sm:text-[17px] font-bold leading-none tabular-nums">
+    <div className="flex flex-col items-center min-w-[28px]">
+      <span className="font-mono text-sm sm:text-base font-bold leading-none tabular-nums">
         {value}
       </span>
-      <span className="font-mono text-[8px] sm:text-[9px] uppercase tracking-widest mt-0.5 opacity-60">
+      <span className="font-mono text-[8px] uppercase tracking-widest mt-0.5 opacity-50">
         {label}
       </span>
     </div>
@@ -26,57 +26,39 @@ function Unit({ value, label }: { value: string; label: string }) {
 
 function Sep() {
   return (
-    <span className="font-mono text-[13px] sm:text-[15px] font-bold opacity-40 pb-2 select-none">
-      :
-    </span>
+    <span className="font-mono text-sm font-bold opacity-30 pb-3 select-none">:</span>
   )
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-interface CountdownTimerProps {
-  /** Compacto: oculta segundos em mobile (default true) */
-  compact?: boolean
-}
-
-export function CountdownTimer({ compact = true }: CountdownTimerProps) {
+export function CountdownTimer() {
   const { days, hours, minutes, seconds, isPast, isUrgent, isCritical, isHydrating } =
     useCountdown(ENEM_2026_DATE)
 
-  // Cor do texto: muda com a proximidade do ENEM
-  const textColor = isCritical
-    ? "text-red-400"
-    : isUrgent
-    ? "text-orange-400"
-    : "text-neutral-300"
+  // ── Paleta de urgência ─────────────────────────────────────────────────────
+  const textColor   = isCritical ? "text-red-400"    : isUrgent ? "text-orange-400"    : "text-neutral-200"
+  const borderColor = isCritical ? "border-red-900/60" : isUrgent ? "border-orange-900/60" : "border-neutral-800"
+  const bgColor     = isCritical ? "bg-red-950/30"   : isUrgent ? "bg-orange-950/25"   : "bg-neutral-900/60"
+  const dotColor    = isCritical ? "bg-red-500"      : isUrgent ? "bg-orange-500"       : "bg-[#388bfd]"
 
-  // Border/glow de urgência
-  const borderColor = isCritical
-    ? "border-red-900/60"
-    : isUrgent
-    ? "border-orange-900/60"
-    : "border-neutral-800"
-
-  const bgColor = isCritical
-    ? "bg-red-950/30"
-    : isUrgent
-    ? "bg-orange-950/30"
-    : "bg-neutral-900/60"
-
-  // Esqueleto durante hidratação — evita mismatch SSR
+  // ── Esqueleto durante SSR / 1º render ──────────────────────────────────────
   if (isHydrating) {
     return (
-      <div className={`flex items-center gap-3 rounded-xl border ${borderColor} ${bgColor} px-3 py-2`}>
-        <span className="h-2 w-2 rounded-full bg-neutral-700 animate-pulse" />
-        <span className="font-mono text-[11px] text-neutral-600">ENEM 2026 em: --d --h --m --s</span>
+      <div className="flex items-center gap-2.5 rounded-xl border border-neutral-800 bg-neutral-900/60 px-3 py-2.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-neutral-700 animate-pulse" />
+        <span className="font-mono text-[10px] text-neutral-600 tracking-widest">
+          ENEM&nbsp;2026&nbsp;·&nbsp;--d : --h : --m : --s
+        </span>
       </div>
     )
   }
 
+  // ── Exame já realizado ─────────────────────────────────────────────────────
   if (isPast) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-green-900/50 bg-green-950/30 px-3 py-2">
-        <span className="h-2 w-2 rounded-full bg-green-500" />
+      <div className="flex items-center gap-2.5 rounded-xl border border-green-900/50 bg-green-950/20 px-3 py-2.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
         <span className="font-mono text-[11px] text-green-400 font-semibold uppercase tracking-widest">
           ENEM 2026 realizado!
         </span>
@@ -88,23 +70,20 @@ export function CountdownTimer({ compact = true }: CountdownTimerProps) {
     <div
       className={`
         flex items-center gap-3 rounded-xl border ${borderColor} ${bgColor}
-        px-3 py-2 backdrop-blur-sm
+        px-3 py-2.5 backdrop-blur-sm
+        transition-colors duration-1000
       `}
     >
-      {/* Dot pulsante de "ao vivo" */}
-      <span
-        className={`h-1.5 w-1.5 shrink-0 rounded-full animate-pulse ${
-          isCritical ? "bg-red-500" : isUrgent ? "bg-orange-500" : "bg-[#388bfd]"
-        }`}
-      />
+      {/* Dot pulsante "ao vivo" */}
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full animate-pulse ${dotColor}`} />
 
-      {/* Label ENEM */}
-      <span className={`font-mono text-[9px] sm:text-[10px] uppercase tracking-widest shrink-0 ${textColor} opacity-70`}>
+      {/* Label */}
+      <span className={`font-mono text-[9px] sm:text-[10px] uppercase tracking-widest shrink-0 opacity-60 ${textColor}`}>
         ENEM&nbsp;2026
       </span>
 
       {/* Separador */}
-      <span className="text-neutral-700 text-xs">·</span>
+      <span className="text-neutral-700 text-xs" aria-hidden>·</span>
 
       {/* Unidades de tempo */}
       <div className={`flex items-end gap-1 ${textColor}`}>
@@ -113,12 +92,9 @@ export function CountdownTimer({ compact = true }: CountdownTimerProps) {
         <Unit value={pad(hours)}   label="horas" />
         <Sep />
         <Unit value={pad(minutes)} label="min" />
-
-        {/* Segundos: ocultos em telas muito pequenas quando compact=true */}
-        <span className={compact ? "hidden xs:flex items-end gap-1" : "flex items-end gap-1"}>
-          <Sep />
-          <Unit value={pad(seconds)} label="seg" />
-        </span>
+        {/* Segundos visíveis sempre — fonte pequena não prejudica em mobile */}
+        <Sep />
+        <Unit value={pad(seconds)} label="seg" />
       </div>
     </div>
   )
