@@ -8,8 +8,8 @@ import { SUBJECTS } from "@/config/ufg-weights"
 import { SYLLABUS } from "@/config/syllabus"
 import type { SubjectKey } from "@/config/ufg-weights"
 import type { SyllabusTopic } from "@/config/syllabus"
-import { createClient } from "@/lib/supabase/client"
-import { useAuth } from "@/hooks/useAuth"
+import { supabase } from "@/lib/supabaseClient"
+import { useAuth } from "@/contexts/AuthContext"
 
 // Cores por matéria
 const SUBJECT_HEX: Record<string, string> = {
