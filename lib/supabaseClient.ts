@@ -2,6 +2,27 @@ import { createClient } from "@supabase/supabase-js"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// ── Sessões de tópico ─────────────────────────────────────────────────────────
+
+/**
+ * Uma sessão de aprendizado: uma tentativa do usuário em um tópico específico.
+ * Pode haver múltiplas sessões por (user, topic) — cada "Gerar Nova Variante"
+ * cria uma nova linha.
+ */
+export interface TopicSession {
+  id:           string
+  user_id:      string
+  subject_slug: string
+  topic_slug:   string
+  topic_title:  string
+  content_json: unknown | null     // FullModule serializado; null se ainda gerando
+  current_step: number             // 0-4
+  xp_earned:    number
+  is_completed: boolean
+  created_at:   string
+  updated_at:   string
+}
+
 /**
  * Linha retornada pela tabela cached_modules.
  * Helpers abaixo são server-only: chamados exclusivamente de Route Handlers.
