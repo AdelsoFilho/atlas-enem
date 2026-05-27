@@ -27,6 +27,10 @@ interface ModuleStoreState {
 
   // XP total do módulo
   xpTotal: number
+
+  // Tutor adaptativo — micro-reforço por erro crítico
+  isReinforcementActive:  boolean
+  reinforcementData:      ReinforcementData | null
 }
 
 interface ModuleStoreActions {
