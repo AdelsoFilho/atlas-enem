@@ -5,7 +5,8 @@
       "Bash(npx tsc *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(mkdir -p \"C:/Projeto Atlas/enem/app/learn/[subject]/[topic]/[sessionId]\")"
     ]
   },
   "hooks": {
@@ -15,10 +16,10 @@
         "hooks": [
           {
             "type": "command",
-            "shell": "bash",
             "command": "cd \"C:/Projeto Atlas/enem\" && git add -A && { git diff --cached --quiet || { git commit -m \"chore: auto-sync $(date +%Y-%m-%d)\" && git push origin main; }; } || true",
-            "async": true,
-            "statusMessage": "Sincronizando com GitHub…"
+            "shell": "bash",
+            "statusMessage": "Sincronizando com GitHub…",
+            "async": true
           }
         ]
       }
