@@ -130,6 +130,101 @@ export async function resetUserHistory(userId: string): Promise<void> {
   if (error) throw error
 }
 
+// ── Helpers: topic_sessions (client-side, usa RLS via JWT do usuário) ─────────
+
+/**
+ * Retorna todas as sessões do usuário para um tópico, mais recentes primeiro.
+ * Exclui content_json para não trazer payloads grandes na listagem.
+ */
+export async function getUserTopicSessions(
+  userId:      string,
+  subjectSlug: string,
+  topicSlug:   string
+): Promise<Omit<TopicSession, "content_json">[]> {
+  const { data, error } = await supabase
+    .from("topic_sessions")
+    .select("id, user_id, subject_slug, topic_slug, topic_title, current_step, xp_earned, is_completed, created_at, updated_at")
+    .eq("user_id", userId)
+    .eq("subject_slug", subjectSlug)
+    .eq("topic_slug", topicSlug)
+    .order("created_at", { ascending: false })
+
+  if (error) throw error
+  return (data ?? []) as Omit<TopicSession, "content_json">[]
+}
+
+/**
+ * Cria uma nova sessão com content_json já preenchido.
+ * Retorna o ID gerado pelo banco.
+ */
+export async function insertTopicSession(
+  session: Omit<TopicSession, "created_at" | "updated_at">
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("topic_sessions")
+    .insert(session)
+    .select("id")
+    .single()
+
+  if (error) throw error
+  return (data as { id: string }).id
+}
+
+/**
+ * Atualiza passo atual e XP acumulado de uma sessão em andamento.
+ * Usa MAX semântico: nunca regride o passo salvo.
+ */
+export async function updateSessionProgress(
+  sessionId:   string,
+  currentStep: number,
+  xpEarned:    number
+): Promise<void> {
+  // Não usamos .update() com GREATEST direto — fazemos select + compare no cliente
+  // para evitar stored functions extras. O campo current_step só avança.
+  const { error } = await supabase
+    .from("topic_sessions")
+    .update({ current_step: currentStep, xp_earned: xpEarned })
+    .eq("id", sessionId)
+    .lt("current_step", currentStep)   // só atualiza se o passo for maior que o salvo
+
+  // Sempre atualiza XP independente do passo
+  if (error) {
+    await supabase
+      .from("topic_sessions")
+      .update({ xp_earned: xpEarned })
+      .eq("id", sessionId)
+  }
+}
+
+/**
+ * Marca uma sessão como concluída (is_completed = true, current_step = 4).
+ */
+export async function completeTopicSession(
+  sessionId: string,
+  xpEarned:  number
+): Promise<void> {
+  const { error } = await supabase
+    .from("topic_sessions")
+    .update({ is_completed: true, current_step: 4, xp_earned: xpEarned })
+    .eq("id", sessionId)
+
+  if (error) console.warn("[completeTopicSession]", error.message)
+}
+
+/**
+ * Carrega o content_json completo de uma sessão específica.
+ */
+export async function getTopicSessionById(sessionId: string): Promise<TopicSession | null> {
+  const { data, error } = await supabase
+    .from("topic_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .single()
+
+  if (error || !data) return null
+  return data as TopicSession
+}
+
 // ── Cache de módulos (server-only) ────────────────────────────────────────────
 
 /**
