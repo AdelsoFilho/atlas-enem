@@ -2,10 +2,11 @@
 
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, BookOpen, Star, Lock, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, BookOpen, CheckCircle2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { SUBJECTS } from "@/config/ufg-weights"
 import { SYLLABUS } from "@/config/syllabus"
+import { CountdownTimer } from "@/components/ui/CountdownTimer"
 import type { SubjectKey } from "@/config/ufg-weights"
 import type { SyllabusTopic } from "@/config/syllabus"
 import { supabase } from "@/lib/supabaseClient"
@@ -32,7 +33,6 @@ const DIFF_COLOR: Record<SyllabusTopic["dificuldade"], string> = {
   dificil: "text-red-400  bg-red-400/10  border-red-400/20",
 }
 
-// Converte peso_ufg 1-5 → texto curto para o badge
 function pesoLabel(peso: number): string {
   if (peso >= 5) return "🔥 Queda alta"
   if (peso >= 4) return "⭐ Importante"
@@ -43,15 +43,15 @@ function pesoLabel(peso: number): string {
 // ─── Topic card ───────────────────────────────────────────────────────────────
 
 interface TopicCardProps {
-  topic: SyllabusTopic
-  subject: string
-  accentColor: string
-  stepCompleted: number    // 0-4 do banco
+  topic:         SyllabusTopic
+  subject:       string
+  accentColor:   string
+  stepCompleted: number
 }
 
 function TopicCard({ topic, subject, accentColor, stepCompleted }: TopicCardProps) {
-  const isDone = stepCompleted >= 4
-  const inProgress = stepCompleted > 0 && stepCompleted < 4
+  const isDone      = stepCompleted >= 4
+  const inProgress  = stepCompleted > 0 && stepCompleted < 4
 
   return (
     <Link
@@ -76,8 +76,7 @@ function TopicCard({ topic, subject, accentColor, stepCompleted }: TopicCardProp
         ) : null}
       </div>
 
-      {/* Title */}
-      <p className="text-sm font-semibold text-white pr-6 leading-snug group-hover:text-white">
+      <p className="text-sm font-semibold text-white pr-6 leading-snug">
         {topic.titulo}
       </p>
 
@@ -102,7 +101,7 @@ function TopicCard({ topic, subject, accentColor, stepCompleted }: TopicCardProp
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
-              width: `${(stepCompleted / 4) * 100}%`,
+              width:           `${(stepCompleted / 4) * 100}%`,
               backgroundColor: isDone ? "#22c55e" : accentColor,
             }}
           />
@@ -120,41 +119,80 @@ export default function LearnSubjectPage() {
   const subject = params.subject as SubjectKey
 
   const { user } = useAuth()
-  const [progressMap, setProgressMap] = useState<Record<string, number>>({})
+
+  // progressMap: topic_slug → step numérico (0-4)
+  // Fonte: topic_sessions (a tabela que o sistema atual escreve)
+  // Regra de agregação por tópico:
+  //   - Qualquer sessão is_completed=true → step = 4
+  //   - Senão: max(current_step) entre as sessões daquele tópico
+  const [progressMap,   setProgressMap]   = useState<Record<string, number>>({})
+  const [progressReady, setProgressReady] = useState(false)
 
   const subjectConfig = SUBJECTS[subject]
   const topics        = SYLLABUS[subject] ?? []
   const accentColor   = SUBJECT_HEX[subject] ?? "#388bfd"
 
-  // Redireciona se matéria inválida
   useEffect(() => {
     if (!subjectConfig) router.replace("/")
   }, [subjectConfig, router])
 
-  // Busca progresso do usuário para esta matéria
+  // ── Query corrigida ──────────────────────────────────────────────────────────
+  //
+  // DIAGNÓSTICO DO BUG:
+  // A versão anterior buscava de `user_topic_progress` (step_completed).
+  // O novo sistema de sessões grava em `topic_sessions` (is_completed, current_step).
+  // A tabela `user_topic_progress` pode existir mas estar desatualizada ou vazia.
+  //
+  // FIX: Ler diretamente de `topic_sessions`, que é a fonte-de-verdade atual.
+  // Agregação por topic_slug:
+  //   max(step) onde is_completed conta como step=4, senão usa current_step.
+
   useEffect(() => {
-    if (!user) return
+    if (!user || !subjectConfig) return
+
     supabase
-      .from("user_topic_progress")
-      .select("topic_slug, step_completed")
+      .from("topic_sessions")
+      .select("topic_slug, current_step, is_completed")
       .eq("user_id", user.id)
-      .eq("subject", subject)
-      .then(({ data }: { data: Array<{ topic_slug: string; step_completed: number }> | null }) => {
-        if (!data) return
+      .eq("subject_slug", subject)
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("[progress fetch]", error.message)
+          setProgressReady(true)
+          return
+        }
+
+        const rows = (data ?? []) as Array<{
+          topic_slug:  string
+          current_step: number
+          is_completed: boolean
+        }>
+
+        // Agrega: para cada tópico, guarda o step mais alto encontrado nas suas sessões
         const map: Record<string, number> = {}
-        for (const row of data) map[row.topic_slug] = row.step_completed
+        for (const row of rows) {
+          const effectiveStep = row.is_completed ? 4 : row.current_step
+          const existing      = map[row.topic_slug] ?? 0
+          map[row.topic_slug] = Math.max(existing, effectiveStep)
+        }
+
         setProgressMap(map)
+        setProgressReady(true)
       })
-  }, [user, subject])
+  }, [user, subject, subjectConfig])
 
   if (!subjectConfig) return null
 
-  // Métricas rápidas
+  // Métricas derivadas do progressMap corrigido
   const totalTopics     = topics.length
   const completedTopics = topics.filter(t => (progressMap[t.id] ?? 0) >= 4).length
-  const inProgressCount = topics.filter(t => { const s = progressMap[t.id] ?? 0; return s > 0 && s < 4 }).length
+  const inProgressCount = topics.filter(t => {
+    const s = progressMap[t.id] ?? 0
+    return s > 0 && s < 4
+  }).length
+  const notStarted      = totalTopics - completedTopics - inProgressCount
 
-  // Ordenação: em andamento primeiro, depois por peso_ufg desc, depois fáceis
+  // Ordenação: em andamento primeiro → peso UFG desc → não iniciados
   const sorted = [...topics].sort((a, b) => {
     const sa = progressMap[a.id] ?? 0
     const sb = progressMap[b.id] ?? 0
@@ -167,7 +205,7 @@ export default function LearnSubjectPage() {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      {/* ── Header fixo ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-30 border-b border-neutral-800 bg-black/90 backdrop-blur-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
           <Link
@@ -184,63 +222,85 @@ export default function LearnSubjectPage() {
             {subjectConfig.labelShort}
           </span>
 
-          {/* Progresso geral */}
-          {completedTopics > 0 && (
+          {/* Progresso no header — visível após dados carregarem */}
+          {progressReady && completedTopics > 0 && (
             <span className="ml-auto text-xs text-neutral-500">
               {completedTopics}/{totalTopics} concluídos
             </span>
           )}
         </div>
-
-        {/* Accent line */}
-        <div
-          className="h-[2px] w-full"
-          style={{ backgroundColor: accentColor, opacity: 0.3 }}
-        />
+        <div className="h-[2px] w-full" style={{ backgroundColor: accentColor, opacity: 0.3 }} />
       </header>
 
       {/* ── Hero ────────────────────────────────────────────────────────────── */}
-      <div className="max-w-2xl mx-auto px-4 pt-8 pb-6">
-        <div className="flex items-center gap-3 mb-2">
+      <div className="max-w-2xl mx-auto px-4 pt-8 pb-6 space-y-5">
+
+        {/* Título da matéria */}
+        <div className="flex items-center gap-3">
           <div
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-black font-black text-lg shrink-0"
+            className="flex h-10 w-10 items-center justify-center rounded-xl shrink-0"
             style={{ backgroundColor: accentColor }}
           >
-            <BookOpen className="h-5 w-5" />
+            <BookOpen className="h-5 w-5 text-black" />
           </div>
           <div>
             <h1 className="text-2xl font-black text-white">{subjectConfig.label}</h1>
-            <p className="text-xs text-neutral-500">{totalTopics} tópicos · Peso UFG ×{subjectConfig.weight}</p>
+            <p className="text-xs text-neutral-500">
+              {totalTopics} tópicos · Peso UFG ×{subjectConfig.weight}
+            </p>
           </div>
         </div>
 
-        {/* Stats bar */}
-        {totalTopics > 0 && (
-          <div className="mt-5 flex items-center gap-4 text-xs text-neutral-500">
+        {/* ── Countdown ENEM ──────────────────────────────────────────────── */}
+        <CountdownTimer />
+
+        {/* ── Stats bar ───────────────────────────────────────────────────── */}
+        {progressReady && totalTopics > 0 && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-neutral-500">
             <span className="flex items-center gap-1.5">
               <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-              {completedTopics} concluídos
+              <span>
+                <strong className="text-green-400">{completedTopics}</strong>
+                {" "}concluídos
+              </span>
             </span>
+
             {inProgressCount > 0 && (
               <span className="flex items-center gap-1.5">
                 <div
-                  className="h-3 w-3 rounded-full border-2 border-t-transparent"
+                  className="h-3 w-3 rounded-full border-2 border-t-transparent animate-spin"
                   style={{ borderColor: accentColor }}
                 />
-                {inProgressCount} em andamento
+                <span>
+                  <strong style={{ color: accentColor }}>{inProgressCount}</strong>
+                  {" "}em andamento
+                </span>
               </span>
             )}
-            <span>{totalTopics - completedTopics - inProgressCount} não iniciados</span>
+
+            <span>
+              <strong className="text-neutral-400">{notStarted}</strong>
+              {" "}não iniciados
+            </span>
+          </div>
+        )}
+
+        {/* Skeleton para stats enquanto carrega */}
+        {!progressReady && (
+          <div className="flex gap-4">
+            {[64, 80, 72].map(w => (
+              <div key={w} className="h-3 rounded animate-pulse bg-neutral-800" style={{ width: w }} />
+            ))}
           </div>
         )}
 
         {/* Barra de progresso geral */}
-        {completedTopics > 0 && (
-          <div className="mt-3 h-1.5 w-full rounded-full bg-neutral-800 overflow-hidden">
+        {progressReady && completedTopics > 0 && (
+          <div className="h-1.5 w-full rounded-full bg-neutral-800 overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700"
               style={{
-                width: `${(completedTopics / totalTopics) * 100}%`,
+                width:           `${(completedTopics / totalTopics) * 100}%`,
                 backgroundColor: accentColor,
               }}
             />
