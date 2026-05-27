@@ -190,7 +190,6 @@ export const useModuleStore = create<ModuleStore>()((set, get) => ({
 
   confirmReinforcement: () => set({
     isReinforcementActive: false,
-    // Mantém reinforcementData para histórico; pode ser resetado via reset()
   }),
 
   reset: () => set(initialState),
