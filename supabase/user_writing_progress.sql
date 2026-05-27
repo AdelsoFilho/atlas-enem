@@ -27,6 +27,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_writing_progress_updated_at ON user_writing_progress;
 CREATE TRIGGER trg_writing_progress_updated_at
   BEFORE UPDATE ON user_writing_progress
   FOR EACH ROW EXECUTE FUNCTION set_writing_progress_updated_at();
@@ -34,6 +35,7 @@ CREATE TRIGGER trg_writing_progress_updated_at
 -- ── RLS: cada aluno vê e altera apenas seus próprios dados ────────────────────
 ALTER TABLE user_writing_progress ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "writing_progress_own" ON user_writing_progress;
 CREATE POLICY "writing_progress_own"
   ON user_writing_progress
   USING      (auth.uid() = user_id)
