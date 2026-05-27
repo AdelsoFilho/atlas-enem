@@ -104,6 +104,29 @@ export default function EssayPage() {
                 Escreva usando o Template CORINGA e receba correção por IA nas 5 competências.
               </p>
             </div>
+
+            {/* ── Modo Empreendedor CTA ─────────────────────────────────── */}
+            <Link
+              href="/essay/business-mode"
+              className="group mb-6 flex items-center gap-3 rounded-2xl border border-[#ffd54f]/25 bg-[#ffd54f]/5 p-4 transition-all hover:border-[#ffd54f]/50 hover:bg-[#ffd54f]/10 block"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ffd54f]/15">
+                <Briefcase className="h-5 w-5 text-[#ffd54f]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold text-[#ffd54f]">Redação & Negócios: Saindo do Zero</p>
+                  <span className="rounded-full border border-[#ffd54f]/30 bg-[#ffd54f]/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-[#ffd54f]/70 uppercase">
+                    Novo
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-500 mt-0.5 leading-snug">
+                  Use sua redação para estruturar um plano de negócio real. Nota ENEM + Análise de Viabilidade. Ideias com R$ 0 de investimento.
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-[#ffd54f]/40 group-hover:text-[#ffd54f]/70 transition-colors shrink-0" />
+            </Link>
+
             <EssayEditor />
           </div>
 
