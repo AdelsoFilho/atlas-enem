@@ -177,7 +177,7 @@ export interface WritingLevel {
   levelNumber: number
   levelName: string
   lessons: SkillLesson[]
-  status: "locked" | "in_progress" | "completed"
+  status: LessonStatus
   completedCount: number
   totalCount: number
 }
