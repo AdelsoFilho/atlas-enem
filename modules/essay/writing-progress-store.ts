@@ -2,6 +2,11 @@
 
 import { create } from "zustand"
 import { supabase } from "@/lib/supabaseClient"
+import {
+  getUserWritingState,
+  unlockNextWritingLevel,
+  type UserWritingLevelRow,
+} from "@/lib/supabaseClient"
 import type {
   SkillLesson,
   UserLessonProgress,
@@ -13,41 +18,50 @@ import type {
 // ── State ─────────────────────────────────────────────────────────────────────
 
 interface WritingProgressState {
-  // Skill tree (loaded once from DB)
-  lessons:        SkillLesson[]
-  isTreeLoaded:   boolean
+  // Skill tree loaded once (public)
+  lessons:          SkillLesson[]
+  isTreeLoaded:     boolean
 
-  // User progress map: lessonId → progress
-  progressMap:    Record<string, UserLessonProgress>
+  // Per-lesson scores: lessonId → progress
+  progressMap:      Record<string, UserLessonProgress>
   isProgressLoaded: boolean
 
-  // Derived
+  // Coarse-grained level unlock state (from DB)
+  levelRows:            UserWritingLevelRow[]
+  currentWritingLevel:  number           // mirrors profiles.current_writing_level
+  isLevelStateLoaded:   boolean
+
+  // Derived selectors
   getLevels:       () => WritingLevel[]
   isLevelUnlocked: (levelNumber: number) => boolean
   getLevelStatus:  (levelNumber: number) => LessonStatus
 
   // Actions
-  loadTree:        () => Promise<void>
-  loadProgress:    (userId: string) => Promise<void>
-  saveProgress:    (params: SaveProgressParams) => Promise<void>
+  loadTree:          () => Promise<void>
+  loadProgress:      (userId: string) => Promise<void>
+  loadLevelState:    (userId: string) => Promise<void>
+  saveProgress:      (params: SaveProgressParams) => Promise<void>
 }
 
 interface SaveProgressParams {
-  userId:     string
-  lessonId:   string
-  score:      number
-  status:     "in_progress" | "completed"
-  answerJson?: unknown
+  userId:       string
+  lessonId:     string
+  score:        number
+  status:       "in_progress" | "completed"
+  answerJson?:  unknown
   feedbackJson?: WritingStepFeedback
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 export const useWritingProgressStore = create<WritingProgressState>((set, get) => ({
-  lessons:          [],
-  isTreeLoaded:     false,
-  progressMap:      {},
-  isProgressLoaded: false,
+  lessons:             [],
+  isTreeLoaded:        false,
+  progressMap:         {},
+  isProgressLoaded:    false,
+  levelRows:           [],
+  currentWritingLevel: 0,
+  isLevelStateLoaded:  false,
 
   // ── Derived: build WritingLevel[] from lessons + progressMap ──────────────
   getLevels: () => {
@@ -62,8 +76,8 @@ export const useWritingProgressStore = create<WritingProgressState>((set, get) =
     return Object.entries(levelMap)
       .sort(([a], [b]) => Number(a) - Number(b))
       .map(([levelStr, lvLessons]) => {
-        const levelNumber = Number(levelStr)
-        const sorted = [...lvLessons].sort((a, b) => a.lessonOrder - b.lessonOrder)
+        const levelNumber    = Number(levelStr)
+        const sorted         = [...lvLessons].sort((a, b) => a.lessonOrder - b.lessonOrder)
         const completedCount = sorted.filter(
           l => (progressMap[l.id]?.score ?? 0) >= l.minScoreToPass
         ).length
@@ -81,38 +95,37 @@ export const useWritingProgressStore = create<WritingProgressState>((set, get) =
 
         return {
           levelNumber,
-          levelName: sorted[0]?.levelName ?? `Nível ${levelNumber}`,
-          lessons:   sorted,
+          levelName:      sorted[0]?.levelName ?? `Nível ${levelNumber}`,
+          lessons:        sorted,
           status,
           completedCount,
-          totalCount: sorted.length,
+          totalCount:     sorted.length,
         }
       })
   },
 
-  // Level 0 is always unlocked; level N requires all lessons of N-1 passed
+  // Level 0 always unlocked; level N requires ALL lessons of N-1 passed
   isLevelUnlocked: (levelNumber) => {
     if (levelNumber === 0) return true
     const { lessons, progressMap } = get()
-    const prevLevelLessons = lessons.filter(l => l.levelNumber === levelNumber - 1)
-    return prevLevelLessons.every(
-      l => (progressMap[l.id]?.score ?? 0) >= l.minScoreToPass
-    )
+    const prevLessons = lessons.filter(l => l.levelNumber === levelNumber - 1)
+    if (prevLessons.length === 0) return false
+    return prevLessons.every(l => (progressMap[l.id]?.score ?? 0) >= l.minScoreToPass)
   },
 
   getLevelStatus: (levelNumber) => {
     if (!get().isLevelUnlocked(levelNumber)) return "locked"
     const { lessons, progressMap } = get()
-    const lvLessons = lessons.filter(l => l.levelNumber === levelNumber)
+    const lvLessons      = lessons.filter(l => l.levelNumber === levelNumber)
     const completedCount = lvLessons.filter(
       l => (progressMap[l.id]?.score ?? 0) >= l.minScoreToPass
     ).length
-    if (completedCount === lvLessons.length) return "completed"
+    if (completedCount === lvLessons.length && lvLessons.length > 0) return "completed"
     if (completedCount > 0) return "in_progress"
     return "not_started"
   },
 
-  // ── Load skill tree (public, no auth needed) ──────────────────────────────
+  // ── Load skill tree (public) ──────────────────────────────────────────────
   loadTree: async () => {
     if (get().isTreeLoaded) return
 
@@ -127,7 +140,7 @@ export const useWritingProgressStore = create<WritingProgressState>((set, get) =
       return
     }
 
-    const lessons: SkillLesson[] = (data ?? []).map((row) => ({
+    const lessons: SkillLesson[] = (data ?? []).map(row => ({
       id:             row.lesson_id,
       levelNumber:    row.level_number,
       levelName:      row.level_name,
@@ -143,7 +156,7 @@ export const useWritingProgressStore = create<WritingProgressState>((set, get) =
     set({ lessons, isTreeLoaded: true })
   },
 
-  // ── Load user progress ────────────────────────────────────────────────────
+  // ── Load per-lesson progress ──────────────────────────────────────────────
   loadProgress: async (userId) => {
     const { data, error } = await supabase
       .from("user_writing_progress")
@@ -159,27 +172,44 @@ export const useWritingProgressStore = create<WritingProgressState>((set, get) =
     const progressMap: Record<string, UserLessonProgress> = {}
     for (const row of (data ?? [])) {
       progressMap[row.lesson_id] = {
-        lessonId:       row.lesson_id,
-        status:         row.status,
-        score:          row.score,
-        attempts:       row.attempts,
-        lastAnswerJson: row.last_answer_json,
-        feedbackJson:   row.feedback_json,
-        completedAt:    row.completed_at,
+        lessonId:        row.lesson_id,
+        status:          row.status,
+        score:           row.score,
+        attempts:        row.attempts,
+        lastAnswerJson:  row.last_answer_json,
+        feedbackJson:    row.feedback_json,
+        completedAt:     row.completed_at,
       }
     }
 
     set({ progressMap, isProgressLoaded: true })
   },
 
-  // ── Save progress via RPC (upsert) ────────────────────────────────────────
+  // ── Load coarse-grained level state (DB) ──────────────────────────────────
+  loadLevelState: async (userId) => {
+    const rows = await getUserWritingState(userId)
+
+    if (!rows.length) {
+      set({ isLevelStateLoaded: true })
+      return
+    }
+
+    set({
+      levelRows:           rows,
+      currentWritingLevel: rows[0]?.currentLevel ?? 0,
+      isLevelStateLoaded:  true,
+    })
+  },
+
+  // ── Save progress + auto-unlock ───────────────────────────────────────────
   saveProgress: async ({ userId, lessonId, score, status, answerJson, feedbackJson }) => {
+    // 1. Persist to DB
     const { error } = await supabase.rpc("upsert_writing_progress", {
       p_user_id:     userId,
       p_lesson_id:   lessonId,
       p_score:       score,
       p_status:      status,
-      p_last_answer: answerJson ?? null,
+      p_last_answer: answerJson  ?? null,
       p_feedback:    feedbackJson ?? null,
     })
 
@@ -188,22 +218,50 @@ export const useWritingProgressStore = create<WritingProgressState>((set, get) =
       return
     }
 
-    // Optimistic update
-    set((state) => ({
-      progressMap: {
-        ...state.progressMap,
-        [lessonId]: {
-          lessonId,
-          status,
-          score: Math.max(state.progressMap[lessonId]?.score ?? 0, score),
-          attempts: (state.progressMap[lessonId]?.attempts ?? 0) + 1,
-          lastAnswerJson: answerJson ?? state.progressMap[lessonId]?.lastAnswerJson ?? null,
-          feedbackJson:   feedbackJson ?? state.progressMap[lessonId]?.feedbackJson ?? null,
-          completedAt:    status === "completed"
-            ? (state.progressMap[lessonId]?.completedAt ?? new Date().toISOString())
-            : (state.progressMap[lessonId]?.completedAt ?? null),
-        },
+    // 2. Optimistic update of progressMap
+    const prevMap = get().progressMap
+    const updated: Record<string, UserLessonProgress> = {
+      ...prevMap,
+      [lessonId]: {
+        lessonId,
+        status,
+        score:           Math.max(prevMap[lessonId]?.score ?? 0, score),
+        attempts:        (prevMap[lessonId]?.attempts ?? 0) + 1,
+        lastAnswerJson:  answerJson  ?? prevMap[lessonId]?.lastAnswerJson ?? null,
+        feedbackJson:    feedbackJson ?? prevMap[lessonId]?.feedbackJson  ?? null,
+        completedAt:
+          status === "completed"
+            ? (prevMap[lessonId]?.completedAt ?? new Date().toISOString())
+            : (prevMap[lessonId]?.completedAt ?? null),
       },
+    }
+    set({ progressMap: updated })
+
+    // 3. Check if ALL lessons of current level are now passed
+    if (status !== "completed" && score < 70) return   // quick exit — clearly not done
+
+    const { lessons, currentWritingLevel } = get()
+    const currentLevelLessons = lessons.filter(l => l.levelNumber === currentWritingLevel)
+    const allPassed = currentLevelLessons.every(
+      l => (updated[l.id]?.score ?? 0) >= l.minScoreToPass
+    )
+
+    if (!allPassed || currentLevelLessons.length === 0) return
+
+    // 4. All lessons passed → try unlock
+    const didUnlock = await unlockNextWritingLevel(userId)
+    if (!didUnlock) return
+
+    const newLevel = currentWritingLevel + 1
+
+    // 5. Optimistic update of coarse-grained state
+    set(state => ({
+      currentWritingLevel: newLevel,
+      levelRows: state.levelRows.map(row => {
+        if (row.levelNumber === currentWritingLevel) return { ...row, status: "completed" }
+        if (row.levelNumber === newLevel)            return { ...row, status: "in_progress" }
+        return row
+      }),
     }))
   },
 }))
