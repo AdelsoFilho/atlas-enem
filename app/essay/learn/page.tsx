@@ -2,39 +2,51 @@
 
 import { useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, Crosshair } from "lucide-react"
-import { LevelCard }              from "@/components/writing/LevelCard"
-import { SkillProgressBars }      from "@/components/writing/SkillProgressBars"
-import { CountdownTimer }         from "@/components/ui/CountdownTimer"
-import { useWritingProgressStore } from "@/modules/essay/writing-progress-store"
-import { useAuth }                from "@/contexts/AuthContext"
+import { ArrowLeft, Crosshair, Trophy } from "lucide-react"
+import { WritingLevelBadge }       from "@/components/writing/WritingLevelBadge"
+import { SkillProgressBars }       from "@/components/writing/SkillProgressBars"
+import { CountdownTimer }          from "@/components/ui/CountdownTimer"
+import { useWritingProgressStore }  from "@/modules/essay/writing-progress-store"
+import { useAuth }                 from "@/contexts/AuthContext"
 
 export default function WritingLearnPage() {
-  const { user }                    = useAuth()
-  const { loadTree, loadProgress, getLevels, isTreeLoaded, isProgressLoaded } =
-    useWritingProgressStore()
+  const { user } = useAuth()
 
-  // Load skill tree (public) and user progress (if logged in)
+  const {
+    loadTree,
+    loadProgress,
+    loadLevelState,
+    getLevels,
+    currentWritingLevel,
+    isTreeLoaded,
+    isProgressLoaded,
+    isLevelStateLoaded,
+  } = useWritingProgressStore()
+
+  // Load skill tree (public)
+  useEffect(() => { loadTree() }, [loadTree])
+
+  // Load user-specific data when logged in
   useEffect(() => {
-    loadTree()
-  }, [loadTree])
+    if (!user) return
+    loadProgress(user.id)
+    loadLevelState(user.id)
+  }, [user, loadProgress, loadLevelState])
 
-  useEffect(() => {
-    if (user) loadProgress(user.id)
-  }, [user, loadProgress])
+  const levels  = getLevels()
+  const isReady = isTreeLoaded && (!user || (isProgressLoaded && isLevelStateLoaded))
 
-  const levels = getLevels()
-  const isLoaded = isTreeLoaded && (!user || isProgressLoaded)
-
-  // Overall progress
   const totalLessons     = levels.reduce((s, l) => s + l.totalCount, 0)
   const completedLessons = levels.reduce((s, l) => s + l.completedCount, 0)
   const overallPct       = totalLessons > 0
     ? Math.round((completedLessons / totalLessons) * 100)
     : 0
 
+  const isHero = currentWritingLevel >= 5 && completedLessons === totalLessons && totalLessons > 0
+
   return (
     <div className="min-h-screen bg-black">
+
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-30 border-b border-neutral-800 bg-black/90 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
@@ -55,14 +67,22 @@ export default function WritingLearnPage() {
             </span>
           </div>
 
-          {completedLessons > 0 && (
-            <span className="ml-auto text-xs text-neutral-500">
-              {completedLessons}/{totalLessons} lições
-            </span>
+          {user && isReady && (
+            <div className="ml-auto flex items-center gap-3">
+              <span className="font-mono text-[10px] text-neutral-500 uppercase tracking-widest">
+                Nível atual
+              </span>
+              <span
+                className="font-mono text-sm font-black"
+                style={{ color: currentWritingLevel >= 5 ? "#56d364" : "#f78166" }}
+              >
+                {currentWritingLevel}/5
+              </span>
+            </div>
           )}
         </div>
 
-        {/* Color bar */}
+        {/* Gradient progress bar */}
         <div className="h-[2px] w-full overflow-hidden bg-neutral-900">
           <div
             className="h-full transition-all duration-700"
@@ -76,24 +96,38 @@ export default function WritingLearnPage() {
 
       <div className="max-w-4xl mx-auto px-4 pt-8 pb-16 space-y-8">
 
-        {/* ── Hero ────────────────────────────────────────────────────────── */}
+        {/* ── Hero section ─────────────────────────────────────────────────── */}
         <div className="space-y-4">
-          <div>
-            <h1 className="text-3xl font-black text-white">
-              Do Zero ao <span className="text-[#f78166]">1000</span>
-            </h1>
-            <p className="text-sm text-neutral-400 mt-1.5">
-              Aprenda redação ENEM do começo, no seu ritmo. Cada nível desbloqueia o próximo.
-            </p>
-          </div>
+          {isHero ? (
+            <div className="flex items-center gap-3">
+              <Trophy className="h-8 w-8 text-[#ffd54f]" />
+              <div>
+                <h1 className="text-3xl font-black text-white">
+                  Modo <span className="text-[#56d364]">Herói</span>
+                </h1>
+                <p className="text-sm text-neutral-400 mt-0.5">
+                  Trilha completa. Você domina a redação ENEM.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <h1 className="text-3xl font-black text-white">
+                Do Zero ao <span className="text-[#f78166]">1000</span>
+              </h1>
+              <p className="text-sm text-neutral-400 mt-1.5">
+                Aprenda redação ENEM do começo, no seu ritmo. Cada nível desbloqueia o próximo.
+              </p>
+            </div>
+          )}
 
           <CountdownTimer />
 
-          {/* Overall progress bar */}
+          {/* Overall progress */}
           {completedLessons > 0 && (
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs text-neutral-500">
-                <span>Progresso geral</span>
+                <span>Progresso geral — {completedLessons}/{totalLessons} lições</span>
                 <span className="font-mono font-bold text-white">{overallPct}%</span>
               </div>
               <div className="h-2 w-full rounded-full bg-neutral-800 overflow-hidden">
@@ -111,33 +145,33 @@ export default function WritingLearnPage() {
           {!user && (
             <div className="rounded-xl border border-orange-900/40 bg-orange-950/20 px-4 py-3">
               <p className="text-sm text-orange-300">
-                <strong>Faça login</strong> para salvar seu progresso entre sessões.
+                <strong>Faça login</strong> para salvar seu progresso e desbloquear níveis.
               </p>
             </div>
           )}
         </div>
 
-        {/* ── Main grid ───────────────────────────────────────────────────── */}
+        {/* ── Main grid ────────────────────────────────────────────────────── */}
         <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
 
-          {/* Level cards */}
+          {/* Level badges */}
           <div className="space-y-4">
             <p className="font-mono text-[10px] text-neutral-600 uppercase tracking-widest">
-              Trilha de aprendizado
+              Trilha de aprendizado — 6 níveis
             </p>
 
-            {isLoaded ? (
-              <div className="grid gap-3 sm:grid-cols-2">
+            {isReady ? (
+              <div className="flex flex-col gap-3">
                 {levels.map(level => (
-                  <LevelCard key={level.levelNumber} level={level} />
+                  <WritingLevelBadge key={level.levelNumber} level={level} />
                 ))}
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div
                     key={i}
-                    className="h-36 rounded-2xl border border-neutral-800 bg-neutral-900/40 animate-pulse"
+                    className="h-16 rounded-xl border border-neutral-800 bg-neutral-900/40 animate-pulse"
                   />
                 ))}
               </div>
@@ -146,44 +180,34 @@ export default function WritingLearnPage() {
 
           {/* Sidebar */}
           <div className="space-y-4">
-            {isLoaded && levels.length > 0 && (
+            {/* Competence bars */}
+            {isReady && levels.length > 0 && (
               <SkillProgressBars levels={levels} />
             )}
 
-            {/* Method card */}
+            {/* Método */}
             <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5 space-y-3">
               <p className="font-mono text-[10px] text-neutral-500 uppercase tracking-widest">
                 Método Andaimagem
               </p>
               <div className="space-y-2.5 text-xs text-neutral-400">
-                <div className="flex gap-2">
-                  <span className="text-[#388bfd] shrink-0 font-mono">0→1</span>
-                  <span>Conceitos básicos e identificação de tese</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="text-[#a5d6a7] shrink-0 font-mono">1→2</span>
-                  <span>Estrutura macro do texto</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="text-[#ffd54f] shrink-0 font-mono">2→3</span>
-                  <span>Microestrutura do parágrafo</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="text-[#ce93d8] shrink-0 font-mono">3→4</span>
-                  <span>Coesão e conectivos</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="text-[#f78166] shrink-0 font-mono">4→5</span>
-                  <span>Proposta de intervenção A-A-M-E-D</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="text-[#56d364] shrink-0 font-mono">5</span>
-                  <span>Redação completa cronometrada</span>
-                </div>
+                {[
+                  { label: "0→1", color: "#79c0ff", desc: "Conceitos básicos e identificação de tese" },
+                  { label: "1→2", color: "#a5d6a7", desc: "Estrutura macro do texto"                  },
+                  { label: "2→3", color: "#ffd54f", desc: "Microestrutura do parágrafo"               },
+                  { label: "3→4", color: "#ce93d8", desc: "Coesão e conectivos"                       },
+                  { label: "4→5", color: "#f78166", desc: "Proposta de intervenção A-A-M-E-D"         },
+                  { label: "5",   color: "#56d364", desc: "Redação completa cronometrada"              },
+                ].map(({ label, color, desc }) => (
+                  <div key={label} className="flex gap-2">
+                    <span className="shrink-0 font-mono w-8" style={{ color }}>{label}</span>
+                    <span>{desc}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Quick link to full essay */}
+            {/* Quick link */}
             <Link
               href="/essay"
               className="flex items-center justify-between rounded-2xl border border-neutral-700 bg-neutral-900 px-4 py-3 hover:border-neutral-500 hover:bg-neutral-800 transition-colors group"
