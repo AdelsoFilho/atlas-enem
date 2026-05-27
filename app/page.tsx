@@ -170,6 +170,37 @@ export default function HomePage() {
           </section>
 
           {/* ══════════════════════════════════════════════════════════════
+              SEÇÃO "DO ZERO AO 1000" — badges de nível de redação
+          ══════════════════════════════════════════════════════════════ */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-mono text-[10px] text-neutral-600 uppercase tracking-widest">
+                Trilha de Redação
+              </p>
+              <Link
+                href="/essay/learn"
+                className="font-mono text-[10px] text-[#f78166] hover:text-orange-300 transition-colors uppercase tracking-widest"
+              >
+                Ver tudo →
+              </Link>
+            </div>
+
+            {writingReady ? (
+              <div className="flex flex-col gap-2">
+                {writingLevels.map(level => (
+                  <WritingLevelBadge key={level.levelNumber} level={level} />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-14 rounded-xl border border-neutral-800 bg-neutral-900/40 animate-pulse" />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* ══════════════════════════════════════════════════════════════
               SEÇÃO HISTÓRICO — mostra ao clicar no botão History
           ══════════════════════════════════════════════════════════════ */}
           {showHistory && <UserHistoryList />}
