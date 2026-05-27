@@ -140,6 +140,74 @@ function ExemploStep({ conteudo, onNext }: { conteudo: ExemploConteudo; onNext: 
   )
 }
 
+// ── Modal: Correção de Rota (micro-reforço adaptativo) ───────────────────────
+//
+// Renderizado pelo StepWizard pai sobre qualquer etapa quando
+// isReinforcementActive = true no store.
+// Bloqueia completamente o fluxo até o aluno confirmar a leitura.
+
+function ReinforcementModal({ data }: { data: ReinforcementData }) {
+  const { confirmReinforcement } = useModuleStore()
+  const [read, setRead] = useState(false)
+
+  // Habilita o botão somente após 4 segundos — garante leitura mínima
+  useEffect(() => {
+    const t = setTimeout(() => setRead(true), 4000)
+    return () => clearTimeout(t)
+  }, [])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-2xl p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.92, y: 16 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.92, y: 16 }}
+        transition={{ type: "spring", stiffness: 300, damping: 26 }}
+        className="w-full max-w-sm rounded-2xl border border-amber-500/30 bg-neutral-950 p-5 flex flex-col gap-4"
+      >
+        {/* Header */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/20">
+            <Brain className="h-4 w-4 text-amber-400" />
+          </div>
+          <div>
+            <p className="font-mono text-[10px] text-amber-400 uppercase tracking-widest">
+              Correção de Rota
+            </p>
+            <p className="text-sm font-bold text-white leading-tight mt-0.5">
+              {data.lacuna}
+            </p>
+          </div>
+        </div>
+
+        {/* Analogia */}
+        <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-4">
+          <p className="text-sm text-neutral-300 leading-relaxed">{data.analogia}</p>
+        </div>
+
+        {/* CTA */}
+        <button
+          onClick={confirmReinforcement}
+          disabled={!read}
+          className={[
+            "w-full rounded-xl py-3 text-sm font-bold transition-all duration-300",
+            read
+              ? "bg-amber-500 text-black hover:bg-amber-400"
+              : "bg-neutral-800 text-neutral-600 cursor-not-allowed",
+          ].join(" ")}
+        >
+          {read ? "Entendi — pode avançar →" : "Leia antes de continuar…"}
+        </button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // ── Step 3: Treino ────────────────────────────────────────────────────────────
 
 function TreinoStep({ conteudo, onValidated }: { conteudo: TreinoConteudo; onValidated: () => void }) {
