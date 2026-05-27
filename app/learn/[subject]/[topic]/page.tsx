@@ -1,16 +1,20 @@
 "use client"
 
-import { useEffect, useCallback } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, BookOpen, Sparkles } from "lucide-react"
 import { SUBJECTS } from "@/config/ufg-weights"
-import { SYLLABUS, getTopicBySlug } from "@/config/syllabus"
-import { StepWizard } from "@/components/learning/StepWizard"
+import { getTopicBySlug } from "@/config/syllabus"
+import { SessionHistoryList } from "@/components/learning/SessionHistoryList"
 import { useModuleStore } from "@/modules/learning/module-store"
-import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/contexts/AuthContext"
+import {
+  getUserTopicSessions,
+  insertTopicSession,
+} from "@/lib/supabaseClient"
 import type { SubjectKey } from "@/config/ufg-weights"
+import type { TopicSession } from "@/lib/supabaseClient"
 import type { FullModule } from "@/modules/learning/module-types"
 
 // Cores por matéria
@@ -22,40 +26,68 @@ const SUBJECT_HEX: Record<string, string> = {
   writing:    "#ffd54f",
 }
 
-// ─── Loading screen ───────────────────────────────────────────────────────────
+// ─── Empty state (nunca estudou este tópico) ──────────────────────────────────
 
-function LoadingScreen({ label }: { label: string }) {
+function EmptyState({
+  topicTitle,
+  accentColor,
+  isLoading,
+  onStart,
+}: {
+  topicTitle:  string
+  accentColor: string
+  isLoading:   boolean
+  onStart:     () => void
+}) {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-36 text-center px-4">
-      <div className="h-9 w-9 rounded-full border-2 border-[#388bfd] border-t-transparent animate-spin" />
-      <p className="text-neutral-300 text-sm font-medium">{label}</p>
-      <p className="text-neutral-600 text-xs max-w-xs">
-        A IA está gerando teoria, exemplos e questões personalizadas para este tópico
-      </p>
-    </div>
-  )
-}
-
-// ─── Error screen ─────────────────────────────────────────────────────────────
-
-function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-36 text-center px-4">
-      <span className="text-4xl">⚠️</span>
-      <p className="text-red-400 text-sm max-w-xs">{message}</p>
-      <button
-        onClick={onRetry}
-        className="mt-2 rounded-xl border border-neutral-700 bg-neutral-900 px-5 py-2 text-sm text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
+    <div className="flex flex-col items-center gap-6 py-16 text-center px-4">
+      <div
+        className="flex h-16 w-16 items-center justify-center rounded-2xl"
+        style={{ backgroundColor: `${accentColor}20`, border: `1px solid ${accentColor}30` }}
       >
-        Tentar novamente
+        <BookOpen className="h-8 w-8" style={{ color: accentColor }} />
+      </div>
+
+      <div>
+        <h2 className="text-xl font-black text-white">Ainda não estudado</h2>
+        <p className="text-sm text-neutral-400 mt-1 max-w-xs">
+          Crie sua primeira lição sobre <strong className="text-neutral-200">{topicTitle}</strong>.
+          A IA gera teoria, exemplos e questões personalizadas.
+        </p>
+      </div>
+
+      <button
+        onClick={onStart}
+        disabled={isLoading}
+        className="flex items-center gap-2 rounded-2xl px-8 py-4 text-sm font-bold text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ backgroundColor: isLoading ? "#555" : accentColor }}
+      >
+        {isLoading ? (
+          <>
+            <div className="h-4 w-4 rounded-full border-2 border-black/40 border-t-transparent animate-spin" />
+            Preparando lição…
+          </>
+        ) : (
+          <>
+            <Sparkles className="h-4 w-4" />
+            Iniciar Primeira Lição
+          </>
+        )}
       </button>
+
+      {isLoading && (
+        <p className="text-xs text-neutral-500 max-w-xs leading-relaxed">
+          A IA está gerando teoria, exemplos e questões para este tópico.
+          Isso pode levar até 20 segundos.
+        </p>
+      )}
     </div>
   )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function TopicModulePage() {
+export default function TopicSessionsPage() {
   const params  = useParams()
   const router  = useRouter()
   const { user } = useAuth()
@@ -67,134 +99,118 @@ export default function TopicModulePage() {
   const topic         = getTopicBySlug(subject, topicSlug)
   const accentColor   = SUBJECT_HEX[subject] ?? "#388bfd"
 
-  const {
-    module,
-    screen,
-    isLoading,
-    loadError,
-    startLoading,
-    loadModule,
-    setLoadError,
-    reset,
-  } = useModuleStore()
+  const { loadFromSession, reset } = useModuleStore()
 
-  // ── Fetch module ─────────────────────────────────────────────────────────
+  // ── Estado local ─────────────────────────────────────────────────────────
+  const [sessions,     setSessions]     = useState<Omit<TopicSession, "content_json">[]>([])
+  const [isFetching,   setIsFetching]   = useState(true)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [createError,  setCreateError]  = useState<string | null>(null)
 
-  const fetchModule = useCallback(async () => {
-    if (!topic) return
-    startLoading()
+  // ── Redireciona se tópico/matéria inválidos ───────────────────────────────
+  useEffect(() => {
+    if (!subjectConfig || !topic) router.replace(`/learn/${subject}`)
+  }, [subjectConfig, topic, subject, router])
+
+  // ── Carrega histórico de sessões ──────────────────────────────────────────
+  const loadSessions = useCallback(async () => {
+    if (!user || !topic) return
+    setIsFetching(true)
     try {
-      const res = await fetch("/api/generate-module", {
+      const data = await getUserTopicSessions(user.id, subject, topicSlug)
+      setSessions(data)
+    } catch (err) {
+      console.warn("[sessions fetch]", err)
+    } finally {
+      setIsFetching(false)
+    }
+  }, [user, topic, subject, topicSlug])
+
+  useEffect(() => { loadSessions() }, [loadSessions])
+
+  // ── Criação de nova sessão ────────────────────────────────────────────────
+  //
+  // Fluxo:
+  // 1. Chama /api/topic/sessions para gerar o módulo (pode demorar ~15s)
+  // 2. Salva a sessão no DB via client-side helper (RLS garante ownership)
+  // 3. Pré-carrega o módulo no store para início instantâneo na player page
+  // 4. Navega para /learn/[subject]/[topic]/[sessionId]
+
+  async function handleCreateSession(forceNew = false) {
+    if (!user || !topic || isGenerating) return
+    setIsGenerating(true)
+    setCreateError(null)
+
+    try {
+      const action = forceNew ? "generate_fresh" : "generate"
+
+      const res = await fetch("/api/topic/sessions", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          action,
           subject,
-          topicSlug: topic.id,
+          topicSlug:  topic.id,
           topicTitle: topic.titulo,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? "Erro na API")
-      loadModule(data as FullModule)
+
+      if (!res.ok) {
+        const { error } = await res.json()
+        throw new Error(error ?? "Erro na API")
+      }
+
+      const { module } = await res.json() as { module: FullModule }
+
+      // Salva a sessão no DB (client-side, usa JWT do usuário → RLS)
+      const sessionId = await insertTopicSession({
+        id:           crypto.randomUUID(),
+        user_id:      user.id,
+        subject_slug: subject,
+        topic_slug:   topic.id,
+        topic_title:  topic.titulo,
+        content_json: module,
+        current_step: 0,
+        xp_earned:    0,
+        is_completed: false,
+      })
+
+      // Pré-carrega o módulo no store → player page inicia imediatamente
+      loadFromSession(module, sessionId, 0)
+
+      router.push(`/learn/${subject}/${topicSlug}/${sessionId}`)
+
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "Falha ao gerar o módulo.")
+      console.error("[create session]", err)
+      setCreateError(
+        err instanceof Error ? err.message : "Falha ao gerar lição. Tente novamente."
+      )
+    } finally {
+      setIsGenerating(false)
     }
-  }, [topic, subject, startLoading, loadModule, setLoadError])
+  }
 
-  // ── Redireciona se inválido, carrega se ainda não carregado ──────────────
-
-  useEffect(() => {
-    if (!subjectConfig || !topic) {
-      router.replace(`/learn/${subject}`)
-      return
-    }
-    // Evita refetch se já carregou o módulo deste tópico
-    if (module?.topico === topic.titulo) return
-    fetchModule()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, topicSlug])
-
-  // ── Persiste progresso no Supabase quando o wizard avança ────────────────
-
-  useEffect(() => {
-    if (!user || !topic || !module) return
-
-    // Mapeia screen → step_completed (0-4)
-    const SCREEN_STEP: Record<string, number> = {
-      teoria:    1,
-      exemplo:   2,
-      treino:    2,   // treino ainda não validado
-      validacao: 3,
-      simulado:  3,
-      concluido: 4,
-    }
-    const step = SCREEN_STEP[screen]
-    if (!step) return
-
-    supabase.rpc("upsert_topic_progress", {
-      p_user_id:    user.id,
-      p_subject:    subject,
-      p_topic_slug: topic.id,
-      p_topic_title: topic.titulo,
-      p_step:       step,
-      p_xp:         0,  // XP real é salvo no concluido pelo StepWizard
-    }).then(({ error }: { error: unknown }) => {
-      if (error) console.warn("[upsert_topic_progress]", error)
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen])
-
-  // ── Salva XP e resultado final quando concluído ──────────────────────────
-
-  const { xpTotal, validationResult, simuladoCorreto } = useModuleStore()
-
-  useEffect(() => {
-    if (screen !== "concluido" || !user || !topic) return
-
-    const aprovado = validationResult?.aprovado ?? false
-    const lacunas  = validationResult?.lacunas_identificadas ?? []
-
-    supabase.rpc("upsert_topic_progress", {
-      p_user_id:    user.id,
-      p_subject:    subject,
-      p_topic_slug: topic.id,
-      p_topic_title: topic.titulo,
-      p_step:       4,
-      p_xp:         xpTotal,
-      p_aprovado:   aprovado,
-      p_lacunas:    lacunas,
-    }).then(({ error }: { error: unknown }) => {
-      if (error) console.warn("[upsert_topic_progress concluido]", error)
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen])
-
-  // ── Cleanup ao sair ──────────────────────────────────────────────────────
-
-  useEffect(() => {
-    return () => { reset() }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // ── Continuar sessão existente ────────────────────────────────────────────
+  function handleContinueSession(sessionId: string) {
+    // Reseta o store para garantir estado limpo antes de carregar a sessão
+    reset()
+    router.push(`/learn/${subject}/${topicSlug}/${sessionId}`)
+  }
 
   if (!subjectConfig || !topic) return null
 
-  const handleBack = () => {
-    reset()
-    router.push(`/learn/${subject}`)
-  }
-
   return (
     <div className="min-h-screen bg-black">
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-30 border-b border-neutral-800 bg-black/90 backdrop-blur-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-2 min-w-0">
-          <button
-            onClick={handleBack}
+          <Link
+            href={`/learn/${subject}`}
             className="flex items-center gap-1.5 text-neutral-400 hover:text-white transition-colors shrink-0"
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline text-sm">{subjectConfig.labelShort}</span>
-          </button>
+          </Link>
 
           <span className="text-neutral-700">/</span>
 
@@ -205,29 +221,58 @@ export default function TopicModulePage() {
             {topic.titulo}
           </span>
 
-          {/* Peso UFG badge */}
           <span className="ml-auto shrink-0 rounded-full border border-neutral-700 bg-neutral-900 px-2 py-0.5 text-[10px] text-neutral-400">
             Peso {topic.peso_ufg}/5
           </span>
         </div>
-
-        {/* Accent line */}
-        <div
-          className="h-[2px] w-full"
-          style={{ backgroundColor: accentColor, opacity: 0.3 }}
-        />
+        <div className="h-[2px] w-full" style={{ backgroundColor: accentColor, opacity: 0.3 }} />
       </header>
 
-      {/* ── Content ─────────────────────────────────────────────────────────── */}
+      {/* ── Content ────────────────────────────────────────────────────────── */}
       <main className="max-w-2xl mx-auto px-4 py-8">
-        {isLoading && <LoadingScreen label={`Gerando módulo: ${topic.titulo}…`} />}
 
-        {!isLoading && loadError && (
-          <ErrorScreen message={loadError} onRetry={fetchModule} />
+        {/* Carregando histórico */}
+        {isFetching && (
+          <div className="flex items-center justify-center py-24">
+            <div className="h-6 w-6 rounded-full border-2 border-neutral-600 border-t-transparent animate-spin" />
+          </div>
         )}
 
-        {!isLoading && !loadError && module && (
-          <StepWizard pesoUfg={topic.peso_ufg} onBack={handleBack} />
+        {/* Erro ao criar sessão */}
+        {createError && (
+          <div className="mb-4 rounded-xl border border-red-900/50 bg-red-900/10 px-4 py-3 text-sm text-red-400">
+            {createError}
+          </div>
+        )}
+
+        {/* Cenário B: nenhuma sessão ainda */}
+        {!isFetching && sessions.length === 0 && (
+          <EmptyState
+            topicTitle={topic.titulo}
+            accentColor={accentColor}
+            isLoading={isGenerating}
+            onStart={() => handleCreateSession(false)}
+          />
+        )}
+
+        {/* Cenário A: lista de sessões anteriores */}
+        {!isFetching && sessions.length > 0 && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-lg font-black text-white">{topic.titulo}</h2>
+              <p className="text-xs text-neutral-500 mt-1">
+                Selecione uma sessão para continuar ou crie uma nova variante.
+              </p>
+            </div>
+
+            <SessionHistoryList
+              sessions={sessions}
+              accentColor={accentColor}
+              isGenerating={isGenerating}
+              onContinue={handleContinueSession}
+              onNewVariant={() => handleCreateSession(true)}
+            />
+          </div>
         )}
       </main>
     </div>
