@@ -16,11 +16,13 @@ import { LoginModal }          from "@/components/ui/LoginModal"
 import { CountdownTimer }      from "@/components/ui/CountdownTimer"
 import { AuthSync }            from "@/components/auth/AuthSync"
 import { ClientOnlyIcon }      from "@/components/ui/ClientOnlyIcon"
-import { useGamificationStore }  from "@/store/gamification-store"
-import { useHasMounted }       from "@/hooks/useHasMounted"
-import { useAuth }             from "@/contexts/AuthContext"
-import { SUBJECTS }            from "@/config/ufg-weights"
-import type { SubjectKey }     from "@/config/ufg-weights"
+import { useGamificationStore }     from "@/store/gamification-store"
+import { useWritingProgressStore }  from "@/modules/essay/writing-progress-store"
+import { useHasMounted }           from "@/hooks/useHasMounted"
+import { useAuth }                 from "@/contexts/AuthContext"
+import { SUBJECTS }                from "@/config/ufg-weights"
+import { WritingLevelBadge }       from "@/components/writing/WritingLevelBadge"
+import type { SubjectKey }         from "@/config/ufg-weights"
 
 // ── Subject config ────────────────────────────────────────────────────────────
 
