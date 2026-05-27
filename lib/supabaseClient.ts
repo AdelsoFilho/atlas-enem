@@ -280,3 +280,64 @@ export async function saveCachedModule(
   // Falha silenciosa: cache é best-effort; não deve quebrar a rota principal
   if (error) console.warn("[saveCachedModule]", error.message)
 }
+
+// ── Helpers: writing levels ───────────────────────────────────────────────────
+
+export interface UserWritingLevelRow {
+  currentLevel: number
+  levelNumber:  number
+  levelId:      string
+  title:        string
+  status:       "locked" | "in_progress" | "completed"
+  updatedAt:    string
+}
+
+/**
+ * Retorna o estado completo de writing levels do usuário via RPC get_user_writing_state.
+ * Inicializa automaticamente na primeira chamada (via SECURITY DEFINER no banco).
+ */
+export async function getUserWritingState(
+  userId: string
+): Promise<UserWritingLevelRow[]> {
+  const { data, error } = await supabase.rpc("get_user_writing_state", {
+    p_user_id: userId,
+  })
+
+  if (error) {
+    console.warn("[getUserWritingState]", error.message)
+    return []
+  }
+
+  return ((data ?? []) as Array<{
+    current_level: number
+    level_number:  number
+    level_id:      string
+    title:         string
+    status:        string
+    updated_at:    string
+  }>).map(r => ({
+    currentLevel: r.current_level,
+    levelNumber:  r.level_number,
+    levelId:      r.level_id,
+    title:        r.title,
+    status:       r.status as UserWritingLevelRow["status"],
+    updatedAt:    r.updated_at,
+  }))
+}
+
+/**
+ * Tenta desbloquear o próximo nível de redação do usuário.
+ * Retorna true se o desbloqueio ocorreu (havia próximo nível disponível).
+ */
+export async function unlockNextWritingLevel(userId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("unlock_next_level", {
+    p_user_id: userId,
+  })
+
+  if (error) {
+    console.warn("[unlockNextWritingLevel]", error.message)
+    return false
+  }
+
+  return data === true
+}
