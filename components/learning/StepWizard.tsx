@@ -210,46 +210,97 @@ function ReinforcementModal({ data }: { data: ReinforcementData }) {
 
 // ── Step 3: Treino ────────────────────────────────────────────────────────────
 
-function TreinoStep({ conteudo, onValidated }: { conteudo: TreinoConteudo; onValidated: () => void }) {
-  const { submitResposta, respostas, tempoInicio } = useModuleStore()
-  const { module } = useModuleStore()
-  const [currentIdx, setCurrentIdx] = useState(0)
-  const [selected, setSelected] = useState<string | null>(null)
-  const [submitted, setSubmitted] = useState(false)
-  const [isValidating, setIsValidating] = useState(false)
+function TreinoStep({
+  conteudo,
+  pesoUfg,
+  onValidated,
+}: {
+  conteudo:    TreinoConteudo
+  pesoUfg:     number
+  onValidated: () => void
+}) {
+  const store = useModuleStore()
+  const { submitResposta, respostas, tempoInicio, module,
+          activateReinforcement, isReinforcementActive } = store
 
-  const questao = conteudo.questoes[currentIdx]
+  const [currentIdx,   setCurrentIdx]   = useState(0)
+  const [selected,     setSelected]     = useState<string | null>(null)
+  const [submitted,    setSubmitted]     = useState(false)
+  const [isValidating, setIsValidating] = useState(false)
+  // Sinaliza que precisamos avançar assim que o modal de reforço for confirmado
+  const pendingAdvance = useRef(false)
+
+  const questao   = conteudo.questoes[currentIdx]
   const isCorrect = submitted && selected === questao.gabarito
-  const isLast = currentIdx === conteudo.questoes.length - 1
+  const isLast    = currentIdx === conteudo.questoes.length - 1
+
+  // Quando o modal de Correção de Rota é confirmado (isReinforcementActive muda
+  // para false) e havia um avanço pendente, executa o próximo passo.
+  useEffect(() => {
+    if (!isReinforcementActive && pendingAdvance.current) {
+      pendingAdvance.current = false
+      void executeAdvance()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReinforcementActive])
 
   function handleSubmit() {
     if (!selected || submitted) return
     submitResposta(questao as Questao, selected as "A" | "B" | "C" | "D" | "E")
     setSubmitted(true)
+
+    // Dispara checagem de reforço em background se for erro em questão crítica.
+    // Resultado chega antes do aluno clicar em "Próxima" (tempo de leitura ~5s).
+    const errou = selected !== questao.gabarito
+    const critica = questao.nivel === "dificil" || pesoUfg >= 4
+    if (errou && critica) {
+      fetch("/api/validate-answer", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topico:        module?.topico ?? "",
+          questao,
+          respostaAluno: selected,
+          pesoUfg,
+        }),
+      })
+        .then(r => r.json() as Promise<ValidateAnswerResponse>)
+        .then(data => {
+          if (data.requiresMicroReinforcement && data.reinforcementData) {
+            // Armazena no ref; será consumido em handleNext
+            pendingReinforcementRef.current = data.reinforcementData
+          }
+        })
+        .catch(() => { /* falha silenciosa */ })
+    }
   }
 
-  async function handleNext() {
+  // Ref para guardar o reforço recebido assincronamente enquanto o aluno
+  // lê o feedback da questão. Evita estado React extra que causaria re-render.
+  const pendingReinforcementRef = useRef<ReinforcementData | null>(null)
+
+  async function executeAdvance() {
     if (!isLast) {
       setCurrentIdx(i => i + 1)
       setSelected(null)
       setSubmitted(false)
+      pendingReinforcementRef.current = null
       return
     }
 
-    // Todas respondidas — chamar validate-module
+    // Última questão → chamada de validação geral do treino
     setIsValidating(true)
     try {
       const allRespostas = [...respostas]
       const tempo = getTempoGasto(tempoInicio)
-      const pesoUfg = 3 // valor padrão; a página pode injetar via prop
 
       const res = await fetch("/api/validate-module", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          topico: module?.topico ?? "",
+          topico:        module?.topico ?? "",
           pesoUfg,
-          respostas: allRespostas,
+          respostas:     allRespostas,
           tempoSegundos: tempo,
         }),
       })
@@ -258,18 +309,29 @@ function TreinoStep({ conteudo, onValidated }: { conteudo: TreinoConteudo; onVal
       onValidated()
     } catch {
       useModuleStore.getState().setValidationResult({
-        aprovado: true,
-        acertos: respostas.filter(r => r.acertou).length,
-        xp_ganho: respostas.filter(r => r.acertou).length * 45,
-        lacunas_identificadas: [],
+        aprovado:                   true,
+        acertos:                    respostas.filter(r => r.acertou).length,
+        xp_ganho:                   respostas.filter(r => r.acertou).length * pesoUfg * 15,
+        lacunas_identificadas:      [],
         recomendacao_proxima_etapa: "avançar_simulado",
-        feedback_curto: "Segue para o simulado.",
-        analise_tempo: "normal",
+        feedback_curto:             "Segue para o simulado.",
+        analise_tempo:              "normal",
       })
       onValidated()
     } finally {
       setIsValidating(false)
     }
+  }
+
+  async function handleNext() {
+    // Se há reforço pendente pronto para exibir → ativa o modal e aguarda
+    if (pendingReinforcementRef.current) {
+      activateReinforcement(pendingReinforcementRef.current)
+      pendingReinforcementRef.current = null
+      pendingAdvance.current = true  // executeAdvance rodará após confirmReinforcement()
+      return
+    }
+    await executeAdvance()
   }
 
   const nivelColor = { facil: "text-green-400", medio: "text-yellow-400", dificil: "text-red-400" }
