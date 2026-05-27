@@ -31,6 +31,11 @@ interface ModuleStoreState {
   // Tutor adaptativo — micro-reforço por erro crítico
   isReinforcementActive:  boolean
   reinforcementData:      ReinforcementData | null
+
+  // Gerenciamento de sessão
+  activeSessionId:  string | null
+  /** true quando a sessão foi carregada do histórico (não é nova) */
+  isRecovery:       boolean
 }
 
 interface ModuleStoreActions {
