@@ -48,6 +48,12 @@ interface ModuleStoreActions {
   // Simulado
   submitSimulado: (resposta: "A" | "B" | "C" | "D" | "E", gabarito: string, xpBonus: number) => void
 
+  // Tutor adaptativo
+  /** Ativa o modal de Correção de Rota com o conteúdo gerado pela IA */
+  activateReinforcement: (data: ReinforcementData) => void
+  /** Confirma leitura do reforço — libera o fluxo para a próxima questão */
+  confirmReinforcement:  () => void
+
   reset: () => void
 }
 
