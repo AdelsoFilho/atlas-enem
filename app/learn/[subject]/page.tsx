@@ -139,7 +139,7 @@ export default function LearnSubjectPage() {
       .select("topic_slug, step_completed")
       .eq("user_id", user.id)
       .eq("subject", subject)
-      .then(({ data }) => {
+      .then(({ data }: { data: Array<{ topic_slug: string; step_completed: number }> | null }) => {
         if (!data) return
         const map: Record<string, number> = {}
         for (const row of data) map[row.topic_slug] = row.step_completed
