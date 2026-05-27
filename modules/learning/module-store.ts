@@ -59,6 +59,15 @@ interface ModuleStoreActions {
   /** Confirma leitura do reforço — libera o fluxo para a próxima questão */
   confirmReinforcement:  () => void
 
+  // Gerenciamento de sessão
+  /**
+   * Carrega módulo de uma sessão salva no DB.
+   * Diferente de loadModule: preserva resumeStep para voltar à tela certa
+   * e sinaliza isRecovery=true para o header mostrar o indicador correto.
+   */
+  loadFromSession: (module: FullModule, sessionId: string, resumeStep: number) => void
+  setActiveSessionId: (id: string | null) => void
+
   reset: () => void
 }
 
