@@ -108,3 +108,59 @@ export async function resetUserHistory(userId: string): Promise<void> {
 
   if (error) throw error
 }
+
+// ── Cache de módulos (server-only) ────────────────────────────────────────────
+
+/**
+ * Retorna o conteúdo cacheado de um módulo se ele existir e não tiver expirado.
+ * Retorna null em cache miss ou expirado.
+ * ⚠️ Chamar apenas de Route Handlers (Node.js) — não de componentes client-side.
+ */
+export async function getCachedModule(
+  topicSlug: string,
+  subject: string
+): Promise<unknown | null> {
+  const { data, error } = await supabase
+    .from("cached_modules")
+    .select("content_json, expires_at")
+    .eq("topic_slug", topicSlug)
+    .eq("subject", subject)
+    .single()
+
+  if (error || !data) return null
+
+  // Valida TTL no lado do cliente além do filtro SQL (dupla garantia)
+  if (new Date(data.expires_at) < new Date()) return null
+
+  return data.content_json
+}
+
+/**
+ * Persiste ou atualiza um módulo no cache com TTL de 30 dias.
+ * Usa UPSERT pela constraint UNIQUE(topic_slug, subject).
+ * ⚠️ Chamar apenas de Route Handlers (Node.js) — não de componentes client-side.
+ */
+export async function saveCachedModule(
+  topicSlug: string,
+  subject:   string,
+  content:   unknown,
+  checksum:  string
+): Promise<void> {
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { error } = await supabase
+    .from("cached_modules")
+    .upsert(
+      {
+        topic_slug:    topicSlug,
+        subject,
+        content_json:  content,
+        hash_checksum: checksum,
+        expires_at:    expiresAt,
+      },
+      { onConflict: "topic_slug,subject" }
+    )
+
+  // Falha silenciosa: cache é best-effort; não deve quebrar a rota principal
+  if (error) console.warn("[saveCachedModule]", error.message)
+}
