@@ -70,6 +70,8 @@ const initialState: ModuleStoreState = {
   respostaSimulado: null,
   simuladoCorreto: null,
   xpTotal: 0,
+  isReinforcementActive: false,
+  reinforcementData: null,
 }
 
 export const useModuleStore = create<ModuleStore>()((set, get) => ({
