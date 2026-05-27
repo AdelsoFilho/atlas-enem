@@ -2,6 +2,20 @@ import { createClient } from "@supabase/supabase-js"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Linha retornada pela tabela cached_modules.
+ * Helpers abaixo são server-only: chamados exclusivamente de Route Handlers.
+ */
+export interface CachedModuleRow {
+  id:            string
+  topic_slug:    string
+  subject:       string
+  content_json:  unknown          // tipado como FullModule pelo chamador
+  hash_checksum: string
+  created_at:    string
+  expires_at:    string
+}
+
 export interface DbProfile {
   id:         string
   email:      string
