@@ -6,6 +6,7 @@ import type {
   ModuleScreen,
   RespostaAluno,
   ValidationResult,
+  ReinforcementData,
   Questao,
 } from "./module-types"
 
