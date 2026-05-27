@@ -365,7 +365,7 @@ export default function LevelPage() {
 
   const levels    = getLevels()
   const level     = levels.find(l => l.levelNumber === levelId)
-  const isLoaded  = isTreeLoaded && (!user || isProgressLoaded)
+  const isLoaded  = isTreeLoaded && (!user || (isProgressLoaded && isLevelStateLoaded))
   const unlocked  = isLevelUnlocked(levelId)
 
   // ── Current lesson index: first not-passed lesson ──────────────────────────
