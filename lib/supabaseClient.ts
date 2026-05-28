@@ -225,6 +225,36 @@ export async function getTopicSessionById(sessionId: string): Promise<TopicSessi
   return data as TopicSession
 }
 
+// ── Helpers: progresso por matéria (dashboard) ───────────────────────────────
+
+/**
+ * Retorna o número de tópicos distintos concluídos por matéria para um usuário.
+ * Lê de topic_sessions (is_completed = true, distinct topic_slug por subject_slug).
+ * Resultado: { math: 3, languages: 1, ... }
+ */
+export async function getSubjectTopicCompletion(
+  userId: string
+): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from("topic_sessions")
+    .select("subject_slug, topic_slug")
+    .eq("user_id", userId)
+    .eq("is_completed", true)
+
+  if (error || !data) return {}
+
+  // Conta tópicos distintos por matéria
+  const result: Record<string, Set<string>> = {}
+  for (const row of data as { subject_slug: string; topic_slug: string }[]) {
+    if (!result[row.subject_slug]) result[row.subject_slug] = new Set()
+    result[row.subject_slug].add(row.topic_slug)
+  }
+
+  return Object.fromEntries(
+    Object.entries(result).map(([subject, set]) => [subject, set.size])
+  )
+}
+
 // ── Cache de módulos (server-only) ────────────────────────────────────────────
 
 /**
