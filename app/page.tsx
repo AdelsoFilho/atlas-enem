@@ -217,9 +217,12 @@ export default function HomePage() {
             <div className="grid gap-2.5 sm:grid-cols-2">
               {SUBJECT_ORDER.map((key) => {
                 const s = SUBJECTS[key]
-                const accuracy = mounted
-                  ? Math.round((subjectPerformance[key]?.accuracy ?? 0) * 100)
-                  : 0
+                // Redação: usa meta diária (accuracy do gamification store)
+                // Demais: usa tópicos concluídos / total (Supabase)
+                const progress = !mounted ? 0
+                  : key === "writing"
+                    ? Math.round((subjectPerformance[key]?.accuracy ?? 0) * 100)
+                    : (topicProgress[key] ?? 0)
                 return (
                   <StandardEntryCard
                     key={key}
@@ -227,7 +230,7 @@ export default function HomePage() {
                     description={s.description}
                     tag={SUBJECT_TAG[key]}
                     icon={SUBJECT_ICON[key]}
-                    progress={accuracy}
+                    progress={progress}
                     href={subjectHref(key)}
                     ariaLabel={`Iniciar aula de ${s.labelShort}`}
                     accentColor={SUBJECT_ACCENT[key]}
