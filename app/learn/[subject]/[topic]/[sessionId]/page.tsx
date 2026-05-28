@@ -14,8 +14,9 @@ import {
   completeTopicSession,
   supabase,
 } from "@/lib/supabaseClient"
+import { useGamificationStore } from "@/store/gamification-store"
 import type { SubjectKey } from "@/config/ufg-weights"
-import type { FullModule } from "@/modules/learning/module-types"
+import type { FullModule, TreinoConteudo } from "@/modules/learning/module-types"
 
 // Cores por matéria
 const SUBJECT_HEX: Record<string, string> = {
