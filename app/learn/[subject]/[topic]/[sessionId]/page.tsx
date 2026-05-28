@@ -96,6 +96,8 @@ export default function SessionPlayerPage() {
     isRecovery,
     xpTotal,
     validationResult,
+    respostas,
+    simuladoCorreto,
   } = useModuleStore()
 
   // ── Carrega a sessão do DB ────────────────────────────────────────────────
