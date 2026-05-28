@@ -69,6 +69,8 @@ export function EssayEditor() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Erro na correção")
       useEssayStore.getState().setResult(data)
+      // Registra a redação no gamification store → atualiza meta diária + XP
+      useGamificationStore.getState().submitDailyWriting(selectedTheme, content)
     } catch (err) {
       useEssayStore.getState().setCorrectionError(
         err instanceof Error ? err.message : "Erro desconhecido"
