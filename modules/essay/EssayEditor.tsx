@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { useEssayStore } from "./essay-store"
+import { useGamificationStore } from "@/store/gamification-store"
 import { StructureTemplate } from "./StructureTemplate"
 import { CorrectionReport } from "./CorrectionReport"
 
