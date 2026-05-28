@@ -59,7 +59,7 @@ function CompetenceCard({ c }: { c: CompetenceResult }) {
             className="overflow-hidden"
           >
             <div className="px-4 pb-4 pt-1 border-t border-white/5 space-y-3">
-              <p className="text-surface-2 text-sm leading-relaxed">{c.comentario}</p>
+              <p className="text-white text-sm leading-relaxed">{c.comentario}</p>
 
               {c.problemas.length > 0 && (
                 <div>
