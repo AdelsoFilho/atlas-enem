@@ -167,7 +167,7 @@ export default function SessionPlayerPage() {
     // Marca sessão como concluída
     void completeTopicSession(activeSessionId, xpTotal)
 
-    // Atualiza XP global no user_topic_progress
+    // Atualiza XP global no user_topic_progress (Supabase)
     void supabase.rpc("upsert_topic_progress", {
       p_user_id:    user.id,
       p_subject:    subject,
@@ -180,6 +180,17 @@ export default function SessionPlayerPage() {
     }).then(({ error }: { error: unknown }) => {
       if (error) console.warn("[upsert_topic_progress concluido]", error)
     })
+
+    // Atualiza gamification store local (barra de precisão do dashboard)
+    const treinoConteudo = module?.modulos[2]?.conteudo as TreinoConteudo | undefined
+    const totalTreino    = treinoConteudo?.questoes?.length ?? 3
+    const acertosTreino  = validationResult?.acertos ?? 0
+    const acertouSimulado = simuladoCorreto === true ? 1 : 0
+    useGamificationStore.getState().submitQuestionSession(
+      subject,
+      totalTreino + 1,           // treino + simulado
+      acertosTreino + acertouSimulado
+    )
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen])
 
