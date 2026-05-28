@@ -54,6 +54,7 @@ export default function HomePage() {
   const mounted                 = useHasMounted()
   const { subjectPerformance }  = useGamificationStore()
   const { user, signOut, loading: authLoading } = useAuth()
+  const { progress: topicProgress } = useSubjectProgress(user?.id ?? null)
 
   // Writing level state
   const {
